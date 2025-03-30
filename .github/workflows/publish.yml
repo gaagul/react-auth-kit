@@ -72,3 +72,16 @@ jobs:
             pnpm publish --access public --no-git-checks
             env:
             NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    
+      - name: Get new version
+        id: package_version
+        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
