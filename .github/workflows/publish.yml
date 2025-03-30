@@ -9,7 +9,9 @@ on:
 
 jobs:
   release:
-    if: contains(github.event.pull_request.labels.*.name, 'release') && github.event.pull_request.merged == true
+    if: >-
+      github.event.pull_request.merged == true &&
+      contains(join(github.event.pull_request.labels.*.name, ','), 'release')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -31,20 +33,21 @@ jobs:
       - name: Determine version bump type
         id: version_bump
         run: |
-          if [[ "${{ toJson(github.event.pull_request.labels) }}" == *"major"* ]]; then
+          labels=$(echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name')
+          if echo "$labels" | grep -q "major"; then
             echo "type=major" >> $GITHUB_ENV
-          elif [[ "${{ toJson(github.event.pull_request.labels) }}" == *"minor"* ]]; then
+          elif echo "$labels" | grep -q "minor"; then
             echo "type=minor" >> $GITHUB_ENV
           else
             echo "type=patch" >> $GITHUB_ENV
           fi
 
       - name: Bump version & Generate Changelog
-        uses: changesets/action@v1
-        with:
-          version: ${{ env.type }}
-          commit: "chore: release new version"
-          title: "chore: release new version"
+        run: |
+          pnpm changeset version
+          git add .
+          git commit -m "chore: release new version"
+          git push
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -57,9 +60,15 @@ jobs:
           token: ${{ secrets.NPM_TOKEN }}
           access: "public"
 
+      - name: Get new version
+        id: package_version
+        run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: "CHANGELOG.md"
+          tag_name: v${{ env.VERSION }}
+          name: Release v${{ env.VERSION }}
+          body_path: CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
