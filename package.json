@@ -1,6 +1,6 @@
 {
   "name": "react-auth-kit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A flexible authentication package for React.",
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
