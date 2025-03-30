@@ -22,43 +22,57 @@ jobs:
         with:
           node-version: "lts/*"
           registry-url: "https://registry.npmjs.org/"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Setup pnpm
         run: |
           corepack enable
           pnpm install
+          echo "pnpm setup complete."
 
       - name: Determine version bump type
         id: version_bump
         run: |
-          labels=$(echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name')
-          if echo "$labels" | grep -q "major"; then
-            bump_type="major"
-          elif echo "$labels" | grep -q "minor"; then
-            bump_type="minor"
+          labels=("${{ join(github.event.pull_request.labels.*.name, ' ') }}")
+
+          if [[ "${labels[@]}" == *patch* ]]; then
+            echo "RELEASE_TYPE=patch" >> $GITHUB_ENV
+          elif [[ "${labels[@]}" == *minor* ]]; then
+            echo "RELEASE_TYPE=minor" >> $GITHUB_ENV
+          elif [[ "${labels[@]}" == *major* ]]; then
+            echo "RELEASE_TYPE=major" >> $GITHUB_ENV
           else
-            bump_type="patch"
+            echo "No valid release label found. Exiting..."
+            exit 1
           fi
-          echo "type=$bump_type" >> $GITHUB_ENV
+
+      - name: Setup git user
+        run: |
+          git config user.name "Gaagul"
+          git config user.email "gaagulgithub@gmail.com"
+          echo "Git user setup complete."
 
       - name: Bump version
         run: |
-            npm version ${{ env.type }} --no-git-tag-version
-            git config --local user.email "${{ github.actor }}@users.noreply.github.com"
-            git config --local user.name "${{ github.actor }}"
-            git add package.json
-            git commit -m "ACTION: Bump version to $(jq -r .version package.json)"
-            git push
+          echo "Bumping package version..."
+          pnpm version ${{ env.RELEASE_TYPE }} --no-git-tag-version
+          git add package.json
+          git commit -m "ACTION: Bump version to $(node -p "require('./package.json').version")"
+          git push
 
       - name: Build package
-        run: pnpm build
+        run: |
+          pnpm build
+          echo "Package build complete."
 
-      - name: Publish to npm
-        uses: JS-DevTools/npm-publish@v3
-        with:
-          token: ${{ secrets.NPM_TOKEN }}
-          access: "public"
-
+      - name: Publish package
+        run: |
+            echo "Publishing @gaagul/react-auth-kit to npm..."
+            pnpm publish --access public --no-git-checks
+            env:
+            NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    
       - name: Get new version
         id: package_version
         run: echo "VERSION=$(jq -r .version package.json)" >> $GITHUB_ENV

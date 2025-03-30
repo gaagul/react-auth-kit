@@ -1,5 +1,5 @@
 {
-  "name": "react-auth-kit",
+  "name": "@gaagul/react-auth-kit",
   "version": "1.0.1",
   "description": "A flexible authentication package for React.",
   "main": "dist/index.cjs.js",
