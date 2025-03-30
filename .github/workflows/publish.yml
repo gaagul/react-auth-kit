@@ -1,0 +1,65 @@
+name: Release & Publish
+
+on:
+  pull_request:
+    types:
+      - closed
+    branches:
+      - main
+
+jobs:
+  release:
+    if: contains(github.event.pull_request.labels.*.name, 'release') && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "lts/*"
+          registry-url: "https://registry.npmjs.org/"
+
+      - name: Setup pnpm
+        run: |
+          corepack enable
+          pnpm install
+
+      - name: Determine version bump type
+        id: version_bump
+        run: |
+          if [[ "${{ toJson(github.event.pull_request.labels) }}" == *"major"* ]]; then
+            echo "type=major" >> $GITHUB_ENV
+          elif [[ "${{ toJson(github.event.pull_request.labels) }}" == *"minor"* ]]; then
+            echo "type=minor" >> $GITHUB_ENV
+          else
+            echo "type=patch" >> $GITHUB_ENV
+          fi
+
+      - name: Bump version & Generate Changelog
+        uses: changesets/action@v1
+        with:
+          version: ${{ env.type }}
+          commit: "chore: release new version"
+          title: "chore: release new version"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build package
+        run: pnpm build
+
+      - name: Publish to npm
+        uses: JS-DevTools/npm-publish@v3
+        with:
+          token: ${{ secrets.NPM_TOKEN }}
+          access: "public"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "CHANGELOG.md"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
