@@ -22,11 +22,14 @@ jobs:
         with:
           node-version: "lts/*"
           registry-url: "https://registry.npmjs.org/"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Setup pnpm
         run: |
           corepack enable
           pnpm install
+          echo "pnpm setup complete."
 
       - name: Determine version bump type
         id: version_bump
@@ -34,22 +37,31 @@ jobs:
           labels=("${{ join(github.event.pull_request.labels.*.name, ' ') }}")
 
           if [[ "${labels[@]}" == *patch* ]]; then
-            echo "::set-output name=RELEASE_TYPE::patch"
+            echo "RELEASE_TYPE=patch" >> $GITHUB_ENV
           elif [[ "${labels[@]}" == *minor* ]]; then
-            echo "::set-output name=RELEASE_TYPE::minor"
+            echo "RELEASE_TYPE=minor" >> $GITHUB_ENV
           elif [[ "${labels[@]}" == *major* ]]; then
-            echo "::set-output name=RELEASE_TYPE::major"
+            echo "RELEASE_TYPE=major" >> $GITHUB_ENV
+          else
+            echo "No valid release label found. Exiting..."
+            exit 1
           fi
 
       - name: Setup git user
         run: |
-          git config user.name "Joseph Mathew"
-          git config user.email "joseph.mathew@bigbinary.com"
+          git config user.name "Gaagul"
+          git config user.email "gaagulgithub@gmail.com"
+          echo "Git user setup complete."
+
+      - name: Bump version
+        run: |
+          echo "Bumping package version..."
+          pnpm version ${{ env.RELEASE_TYPE }} --no-git-tag-version
+          git add package.json
+          git commit -m "ACTION: Bump version to $(node -p "require('./package.json').version")"
+          git push
 
       - name: Build package
         run: |
           pnpm build
-      
-      
-
-      
+          echo "Package build complete."
