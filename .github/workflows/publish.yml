@@ -70,7 +70,7 @@ jobs:
         run: |
             echo "Publishing @gaagul/react-auth-kit to npm..."
             pnpm publish --access public --no-git-checks
-            env:
+        env:
             NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     
       - name: Get new version
