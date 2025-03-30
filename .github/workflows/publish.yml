@@ -16,8 +16,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -33,23 +31,24 @@ jobs:
       - name: Determine version bump type
         id: version_bump
         run: |
-          labels=$(echo ${{ toJson(github.event.pull_request.labels) }} | jq -r '.[].name')
+          labels=$(echo '${{ toJson(github.event.pull_request.labels) }}' | jq -r '.[].name')
           if echo "$labels" | grep -q "major"; then
-            echo "type=major" >> $GITHUB_ENV
+            bump_type="major"
           elif echo "$labels" | grep -q "minor"; then
-            echo "type=minor" >> $GITHUB_ENV
+            bump_type="minor"
           else
-            echo "type=patch" >> $GITHUB_ENV
+            bump_type="patch"
           fi
+          echo "type=$bump_type" >> $GITHUB_ENV
 
-      - name: Bump version & Generate Changelog
+      - name: Bump version
         run: |
-          pnpm changeset version
-          git add .
-          git commit -m "chore: release new version"
+          npm version ${{ env.type }} --no-git-tag-version
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json
+          git commit -m "chore: bump version to $(jq -r .version package.json)"
           git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build package
         run: pnpm build
@@ -69,6 +68,6 @@ jobs:
         with:
           tag_name: v${{ env.VERSION }}
           name: Release v${{ env.VERSION }}
-          body_path: CHANGELOG.md
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
